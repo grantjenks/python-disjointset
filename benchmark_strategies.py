@@ -145,7 +145,7 @@ def main():
     n = 10000  # Number of elements in Union-Find.
     total_ops = 100000  # Total number of operations per workload.
 
-    # Define three workload scenarios with different union:find ratios.
+    # Define five workload scenarios with different union:find ratios.
     scenarios = {
         'Union Heavy': 0.999,
         'Union Bias': 0.9,  # 90% union, 10% find
