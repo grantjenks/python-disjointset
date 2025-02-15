@@ -10,8 +10,6 @@ disjointset is a high-performance C extension module for Python that implements 
 
 Both variants support standard union–find operations including `find`, `union`, `match` (to check connectivity), and `sets` (to extract connected components).
 
----
-
 ## Features
 
 - **Efficient Union–Find Implementation:**
@@ -22,12 +20,10 @@ Both variants support standard union–find operations including `find`, `union`
   - **DynamicDisjointSet:** Ideal for applications requiring support for arbitrary objects, created on the fly.
 
 - **Easy-to-Use API:**
-  A simple factory constructor is provided. Call `disjointset.DisjointSet(n)` (with an integer) to obtain a static variant or `disjointset.DisjointSet(None)` (or no argument) to get the dynamic variant.
+  A simple factory constructor is provided. Call `disjointset.DisjointSet(n)` (with an integer) to obtain a static variant or `disjointset.DisjointSet()` (no argument) to get the dynamic variant.
 
 - **Benchmarking and Testing:**
   Comprehensive benchmarks measure the performance of both the underlying strategies and implementations. Detailed plots are generated during benchmarking and can be viewed via the provided links.
-
----
 
 ## Benchmarks
 
@@ -66,8 +62,6 @@ In addition to multiple strategies for path compression, the project benchmarks 
 
 The benchmark plot for the disjointset implementation illustrates the tradeoffs between these methods. The static variant shows superior performance when high throughput is needed and the element domain is fixed, while the dynamic variant is invaluable for more flexible or heterogeneous data applications.
 
----
-
 ## Installation
 
 Install disjointset using pip:
@@ -75,8 +69,6 @@ Install disjointset using pip:
 ```bash
 python -m pip install disjointset
 ```
-
-> **Note:** As disjointset is a C extension module, you will need a C compiler and the Python development headers installed on your system.
 
 Alternatively, clone the repository and install in editable mode:
 
@@ -86,7 +78,7 @@ cd python-disjointset
 python -m pip install -e .
 ```
 
----
+> **Note:** As disjointset is a C extension module, you will need a C compiler and the Python development headers installed on your system.
 
 ## Usage Example
 
@@ -112,17 +104,15 @@ print("Static groups:", ds_static.sets())
 print("Dynamic groups:", ds_dynamic.sets())
 ```
 
----
-
 ## Benchmarking
 
 For performance analysis, two benchmarking scripts are provided:
 
 - **benchmark_strategies.py:**
-  This script compares the three union–find path compression techniques: full path compression, path halving, and path splitting. The results, clearly showing that path splitting is the fastest, are summarized in a grouped bar chart. View the plot [here](https://github.com/grantjenks/python-disjointset/blob/main/plot-strategies.png?raw=true).
+  This script compares the three union–find path compression techniques: full path compression, path halving, and path splitting. The results, clearly showing that path splitting is the fastest, are summarized in a grouped bar chart.
 
 - **benchmark_disjointset.py:**
-  This benchmark tests the overall disjoint set implementations by running a series of union and find operations across multiple simulated workloads (e.g., union-heavy, mixed, find-heavy). It compares the static (list-based) and dynamic (dict-based) implementations, illustrating the tradeoffs between performance and flexibility. See the results in the [disjointset benchmark plot](https://github.com/grantjenks/python-disjointset/blob/main/plot-disjointset.png?raw=true).
+  This benchmark tests the overall disjoint set implementations by running a series of union and find operations across multiple simulated workloads (e.g., union-heavy, mixed, find-heavy). It compares the static (list-based) and dynamic (dict-based) implementations, illustrating the tradeoffs between performance and flexibility.
 
 To run the benchmarks, execute:
 
@@ -132,8 +122,6 @@ python benchmark_disjointset.py
 ```
 
 Each script will generate and display a bar chart summarizing the results.
-
----
 
 ## Development & Continuous Integration
 
@@ -159,8 +147,6 @@ To develop and test disjointset locally:
    ```
 
 This project leverages GitHub Actions for continuous integration, which runs tests across multiple Python versions and operating systems, checks linting using ruff, and builds wheels for distribution.
-
----
 
 ## License
 
