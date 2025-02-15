@@ -8,8 +8,10 @@ import numpy as np
 # Union‐Find Implementations #
 ##############################
 
+
 class UnionFindFull:
     """Union‐Find with full (recursive) path compression."""
+
     def __init__(self, n):
         self.parent = list(range(n))
         self.rank = [0] * n
@@ -32,8 +34,10 @@ class UnionFindFull:
             self.parent[rootY] = rootX
             self.rank[rootX] += 1
 
+
 class UnionFindHalving:
     """Union‐Find with path halving (iteratively makes nodes point to their grandparent)."""
+
     def __init__(self, n):
         self.parent = list(range(n))
         self.rank = [0] * n
@@ -58,8 +62,10 @@ class UnionFindHalving:
             self.parent[rootY] = rootX
             self.rank[rootX] += 1
 
+
 class UnionFindSplitting:
     """Union‐Find with path splitting (each node along the find path points to its grandparent)."""
+
     def __init__(self, n):
         self.parent = list(range(n))
         self.rank = [0] * n
@@ -84,9 +90,11 @@ class UnionFindSplitting:
             self.parent[rootY] = rootX
             self.rank[rootX] += 1
 
+
 ####################################
 # Workload Generation and Running  #
 ####################################
+
 
 def generate_workload(union_ratio, n, total_ops):
     """
@@ -104,50 +112,53 @@ def generate_workload(union_ratio, n, total_ops):
     for _ in range(union_count):
         a = random.randint(0, n - 1)
         b = random.randint(0, n - 1)
-        ops.append(("union", a, b))
+        ops.append(('union', a, b))
 
     # Generate find operations.
     for _ in range(find_count):
         a = random.randint(0, n - 1)
-        ops.append(("find", a))
+        ops.append(('find', a))
 
     # Shuffle to mix the operations.
     random.shuffle(ops)
     return ops
+
 
 def run_workload(uf, operations):
     """
     Executes the list of operations on the given union-find instance uf.
     """
     for op in operations:
-        if op[0] == "union":
+        if op[0] == 'union':
             uf.union(op[1], op[2])
-        elif op[0] == "find":
+        elif op[0] == 'find':
             uf.find(op[1])
+
 
 ###############################
 # Benchmark and Plot Function #
 ###############################
 
+
 def main():
     # Parameters for the simulation.
-    n = 10000           # Number of elements in Union-Find.
+    n = 10000  # Number of elements in Union-Find.
     total_ops = 100000  # Total number of operations per workload.
 
     # Define three workload scenarios with different union:find ratios.
     scenarios = {
-        "Union Heavy": 0.999,
-        "Union Bias": 0.9,    # 90% union, 10% find
-        "Mixed": 0.5,         # 50% union, 50% find
-        "Find Bias": 0.1,     # 10% union, 90% find
-        "Find Heavy": 0.001,
+        'Union Heavy': 0.999,
+        'Union Bias': 0.9,  # 90% union, 10% find
+        'Mixed': 0.5,  # 50% union, 50% find
+        'Find Bias': 0.1,  # 10% union, 90% find
+        'Find Heavy': 0.001,
     }
 
     # Define the union-find variants to test.
     variants = {
-        "Full": UnionFindFull,
-        "Halving": UnionFindHalving,
-        "Splitting": UnionFindSplitting
+        'Full': UnionFindFull,
+        'Halving': UnionFindHalving,
+        'Splitting': UnionFindSplitting,
     }
 
     # For reproducibility, fix the random seed.
@@ -159,7 +170,7 @@ def main():
 
     # For each scenario, generate a fixed workload and run all variants on it.
     for scenario, union_ratio in scenarios.items():
-        print(f"Running workload: {scenario}")
+        print(f'Running workload: {scenario}')
         # Generate the operation sequence for this scenario.
         ops = generate_workload(union_ratio, n, total_ops)
 
@@ -170,10 +181,11 @@ def main():
             run_workload(uf, ops)
             duration = time.perf_counter() - start
             results[scenario][variant_name] = duration
-            print(f"  {variant_name:8s}: {duration:.4f} seconds")
+            print(f'  {variant_name:8s}: {duration:.4f} seconds')
 
     # Display the results in a grouped bar chart.
     plot_results(results, list(variants.keys()))
+
 
 def plot_results(results, variant_names):
     # Extract the scenario names.
@@ -206,11 +218,19 @@ def plot_results(results, variant_names):
     # Annotate bars with their height (optional)
     for i, variant in enumerate(variant_names):
         for j, val in enumerate(data[variant]):
-            ax.text(x[j] + i * width, val, f'{val:.3f}', ha='center', va='bottom', fontsize=8)
+            ax.text(
+                x[j] + i * width,
+                val,
+                f'{val:.3f}',
+                ha='center',
+                va='bottom',
+                fontsize=8,
+            )
 
     plt.tight_layout()
     plt.savefig('plot-strategies.png')
     plt.show()
+
 
 if __name__ == '__main__':
     main()
