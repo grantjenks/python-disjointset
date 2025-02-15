@@ -97,12 +97,14 @@ typedef struct {
 static int StaticDS_init(StaticDisjointSetObject *self, PyObject *args, PyObject *kwds);
 static void StaticDS_dealloc(StaticDisjointSetObject *self);
 
-/* Helper: recursively find the representative for x with full path compression */
-static int static_find_helper(StaticDisjointSetObject *self, Py_ssize_t x) {
-    if (self->parent[x] != x) {
-        self->parent[x] = static_find_helper(self, self->parent[x]);
+/* Helper: iteratively find the representative for x with path splitting */
+static int static_find(StaticDisjointSetObject *self, Py_ssize_t x) {
+    while (self->parent[x] != x) {
+        int temp = x;
+        x = self->parent[x];
+        self->parent[temp] = self->parent[x];
     }
-    return self->parent[x];
+    return x;
 }
 
 static PyObject *
@@ -116,7 +118,7 @@ StaticDS_find(StaticDisjointSetObject *self, PyObject *args)
         PyErr_SetString(PyExc_IndexError, "index out of range");
         return NULL;
     }
-    int rep = static_find_helper(self, x);
+    int rep = static_find(self, x);
     return PyLong_FromLong(rep);
 }
 
@@ -130,8 +132,8 @@ StaticDS_union(StaticDisjointSetObject *self, PyObject *args)
         PyErr_SetString(PyExc_IndexError, "index out of range");
         return NULL;
     }
-    int rootX = static_find_helper(self, x);
-    int rootY = static_find_helper(self, y);
+    int rootX = static_find(self, x);
+    int rootY = static_find(self, y);
     if (rootX == rootY) {
         Py_RETURN_NONE;
     }
@@ -158,8 +160,8 @@ StaticDS_match(StaticDisjointSetObject *self, PyObject *args)
         PyErr_SetString(PyExc_IndexError, "index out of range");
         return NULL;
     }
-    int repX = static_find_helper(self, x);
-    int repY = static_find_helper(self, y);
+    int repX = static_find(self, x);
+    int repY = static_find(self, y);
     if (repX == repY)
         Py_RETURN_TRUE;
     else
@@ -173,7 +175,7 @@ StaticDS_sets(StaticDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
     if (!groups_dict)
         return NULL;
     for (Py_ssize_t i = 0; i < self->n; i++) {
-        int rep = static_find_helper(self, i);
+        int rep = static_find(self, i);
         PyObject *rep_key = PyLong_FromLong(rep);
         if (!rep_key) {
             Py_DECREF(groups_dict);
@@ -202,8 +204,7 @@ StaticDS_sets(StaticDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
             Py_DECREF(groups_dict);
             return NULL;
         }
-        /* Retrieve group using a new key */
-        PyObject *rep_obj = PyLong_FromLong(static_find_helper(self, i));
+        PyObject *rep_obj = PyLong_FromLong(static_find(self, i));
         if (!rep_obj) {
             Py_DECREF(elem);
             Py_DECREF(groups_dict);
@@ -328,6 +329,7 @@ typedef struct {
 static int DynamicDS_init(DynamicDisjointSetObject *self, PyObject *args, PyObject *kwds);
 static void DynamicDS_dealloc(DynamicDisjointSetObject *self);
 
+/* DynamicDS_find using path splitting */
 static PyObject *
 DynamicDS_find(DynamicDisjointSetObject *self, PyObject *args)
 {
@@ -350,7 +352,7 @@ DynamicDS_find(DynamicDisjointSetObject *self, PyObject *args)
         return x;
     }
 
-    /* Path splitting: update visited nodes to point to their grandparent */
+    /* Path splitting: update visited nodes along the find path */
     while (1) {
         PyObject *par = PyDict_GetItem(self->parent, x);  /* borrowed ref */
         int is_root = PyObject_RichCompareBool(par, x, Py_EQ);
