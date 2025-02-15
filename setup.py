@@ -28,7 +28,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 setup(
     name='disjointset',
     version=get_version(),
-    description='Lightweight C extension module for Python that implements a disjoint set data type.',
+    description='Lightweight C extension module for Python that implements a disjoint set data type for union-find operations.',
     long_description=read_file('README.md'),
     long_description_content_type='text/markdown',
     author='Grant Jenks',

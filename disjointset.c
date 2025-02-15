@@ -16,7 +16,7 @@
 #include <stdlib.h>
 
 #ifndef DISJOINTSET_VERSION
-#define DISJOINTSET_VERSION "1.0.0"
+#define DISJOINTSET_VERSION "1.0.1"
 #endif
 
 /******************************
