@@ -1,21 +1,14 @@
 /*
  * disjointset.c
  *
- * This C extension implements two types:
+ * This C extension implements a new abstract base type, DisjointSet,
+ * which serves as a factory. When constructed with an integer n > 0,
+ * it returns a StaticDisjointSet (using pre-allocated arrays). When constructed
+ * with no argument or with n=None, it returns a DynamicDisjointSet (using dictionaries).
  *
- *   • StaticDisjointSet(n): allocates two C arrays of length n.
- *     The set elements are the integers 0 .. n-1.
+ * Both StaticDisjointSet and DynamicDisjointSet inherit from DisjointSet.
  *
- *   • DynamicDisjointSet(): uses Python dictionaries to map an
- *     arbitrary object to its parent and rank.
- *
- * Both types support the following methods:
- *
- *   union(self, x, y)       -> None
- *   find(self, x)           -> integer representative (root)
- *   match(self, x, y)       -> bool (whether x and y are in the same set)
- *   sets(self)              -> frozenset of frozensets grouping all elements.
- *
+ * Version information is kept using the macro DISJOINTSET_VERSION.
  */
 
 #include <Python.h>
@@ -26,12 +19,75 @@
 #define DISJOINTSET_VERSION "1.0.0"
 #endif
 
-/***********************
- * StaticDisjointSet *
- ***********************/
+/******************************
+ * Abstract Base: DisjointSet *
+ ******************************/
 
 typedef struct {
     PyObject_HEAD
+    /* No instance-specific fields */
+} DisjointSetObject;
+
+/* Forward declaration of our concrete types */
+PyTypeObject StaticDisjointSetType;
+PyTypeObject DynamicDisjointSetType;
+
+/*
+ * Factory new method for DisjointSet.
+ * If no argument is given or if the argument is None, a DynamicDisjointSet is returned.
+ * If an integer > 0 is given, a StaticDisjointSet is returned.
+ */
+
+static PyObject *
+DisjointSet_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds)
+{
+    /* We expect at most one argument ("n") */
+    Py_ssize_t nargs = PyTuple_Size(args);
+    if (nargs == 0) {
+        return PyObject_Call((PyObject *)&DynamicDisjointSetType, args, kwds);
+    }
+    else {
+        PyObject *first;
+        if (!PyArg_UnpackTuple(args, "DisjointSet", 0, 1, &first))
+            return NULL;
+
+        if (first == Py_None) {
+            return PyObject_Call((PyObject *)&DynamicDisjointSetType, args, kwds);
+        }
+
+        if (PyLong_Check(first)) {
+            Py_ssize_t n = PyLong_AsSsize_t(first);
+            if (n <= 0) {
+                PyErr_SetString(PyExc_ValueError, "n must be positive");
+                return NULL;
+            }
+            return PyObject_Call((PyObject *)&StaticDisjointSetType, args, kwds);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, "n must be an integer or None");
+            return NULL;
+        }
+    }
+}
+
+static PyTypeObject DisjointSetType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "disjointset.DisjointSet",
+    .tp_doc = "Abstract base class for disjoint sets.\n\n"
+              "Call with an integer n to get a static disjoint set, or with None/nothing "
+              "to get a dynamic disjoint set.",
+    .tp_basicsize = sizeof(DisjointSetObject),
+    .tp_itemsize = 0,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_new = DisjointSet_new,
+};
+
+/*******************************
+ * StaticDisjointSet: Pre-allocated *
+ *******************************/
+
+typedef struct {
+    DisjointSetObject base;  /* Inherit from DisjointSet */
     Py_ssize_t n;
     int *parent;  /* array of length n */
     int *rank;    /* array of length n */
@@ -41,8 +97,7 @@ typedef struct {
 static int StaticDS_init(StaticDisjointSetObject *self, PyObject *args, PyObject *kwds);
 static void StaticDS_dealloc(StaticDisjointSetObject *self);
 
-/* Helper: recursively find the representative for x.
-   Also compresses the path. */
+/* Helper: recursively find the representative for x with full path compression */
 static int static_find_helper(StaticDisjointSetObject *self, Py_ssize_t x) {
     if (self->parent[x] != x) {
         self->parent[x] = static_find_helper(self, self->parent[x]);
@@ -80,7 +135,6 @@ StaticDS_union(StaticDisjointSetObject *self, PyObject *args)
     if (rootX == rootY) {
         Py_RETURN_NONE;
     }
-    /* union by rank */
     if (self->rank[rootX] < self->rank[rootY]) {
         self->parent[rootX] = rootY;
     }
@@ -89,7 +143,7 @@ StaticDS_union(StaticDisjointSetObject *self, PyObject *args)
     }
     else {
         self->parent[rootY] = rootX;
-        self->rank[rootX]++;
+        self->rank[rootX] += 1;
     }
     Py_RETURN_NONE;
 }
@@ -112,15 +166,12 @@ StaticDS_match(StaticDisjointSetObject *self, PyObject *args)
         Py_RETURN_FALSE;
 }
 
-/* Return a frozenset of frozensets: each inner frozenset is one group.
-   Example: for elements 0,1,2,... return frozenset({frozenset({...}), ...}) */
 static PyObject *
 StaticDS_sets(StaticDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
 {
     PyObject *groups_dict = PyDict_New();
     if (!groups_dict)
         return NULL;
-    /* Group each element by its representative */
     for (Py_ssize_t i = 0; i < self->n; i++) {
         int rep = static_find_helper(self, i);
         PyObject *rep_key = PyLong_FromLong(rep);
@@ -130,7 +181,6 @@ StaticDS_sets(StaticDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
         }
         PyObject *group = PyDict_GetItem(groups_dict, rep_key);
         if (group == NULL) {
-            /* Create new set for this representative */
             group = PySet_New(NULL);
             if (!group) {
                 Py_DECREF(rep_key);
@@ -147,14 +197,20 @@ StaticDS_sets(StaticDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
         }
         Py_DECREF(rep_key);
 
-        /* Insert element i into the set */
         PyObject *elem = PyLong_FromLong(i);
         if (!elem) {
             Py_DECREF(groups_dict);
             return NULL;
         }
-        group = PyDict_GetItem(groups_dict, PyLong_FromLong(rep));  /* get again */
-        /* Since PyDict_GetItem returns a borrowed ref, no DECREF needed */
+        /* Retrieve group using a new key */
+        PyObject *rep_obj = PyLong_FromLong(static_find_helper(self, i));
+        if (!rep_obj) {
+            Py_DECREF(elem);
+            Py_DECREF(groups_dict);
+            return NULL;
+        }
+        group = PyDict_GetItem(groups_dict, rep_obj);
+        Py_DECREF(rep_obj);
         if (PySet_Add(group, elem) < 0) {
             Py_DECREF(elem);
             Py_DECREF(groups_dict);
@@ -163,38 +219,37 @@ StaticDS_sets(StaticDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
         Py_DECREF(elem);
     }
 
-    /* Build a frozenset of frozensets */
     PyObject *outer_set = PySet_New(NULL);
     if (!outer_set) {
         Py_DECREF(groups_dict);
         return NULL;
     }
-    PyObject *keys = PyDict_Values(groups_dict);
-    if (!keys) {
+    PyObject *vals = PyDict_Values(groups_dict);
+    if (!vals) {
         Py_DECREF(groups_dict);
         Py_DECREF(outer_set);
         return NULL;
     }
-    Py_ssize_t len = PyList_Size(keys);
+    Py_ssize_t len = PyList_Size(vals);
     for (Py_ssize_t i = 0; i < len; i++) {
-        PyObject *group = PyList_GetItem(keys, i);  /* borrowed reference */
+        PyObject *group = PyList_GetItem(vals, i);
         PyObject *froz = PyFrozenSet_New(group);
         if (!froz) {
-            Py_DECREF(keys);
+            Py_DECREF(vals);
             Py_DECREF(groups_dict);
             Py_DECREF(outer_set);
             return NULL;
         }
         if (PySet_Add(outer_set, froz) < 0) {
             Py_DECREF(froz);
-            Py_DECREF(keys);
+            Py_DECREF(vals);
             Py_DECREF(groups_dict);
             Py_DECREF(outer_set);
             return NULL;
         }
         Py_DECREF(froz);
     }
-    Py_DECREF(keys);
+    Py_DECREF(vals);
     Py_DECREF(groups_dict);
     PyObject *result = PyFrozenSet_New(outer_set);
     Py_DECREF(outer_set);
@@ -210,13 +265,13 @@ static PyMethodDef StaticDS_methods[] = {
      "match(x, y): Return True if x and y are in the same set."},
     {"sets", (PyCFunction)StaticDS_sets, METH_NOARGS,
      "sets(): Return a frozenset of sets of connected nodes."},
-    {NULL}  /* Sentinel */
+    {NULL}
 };
 
-static PyTypeObject StaticDisjointSetType = {
+PyTypeObject StaticDisjointSetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "disjointset.StaticDisjointSet",
-    .tp_doc = "Statically allocated disjoint set",
+    .tp_doc = "Statically allocated disjoint set (n elements: 0 .. n-1)",
     .tp_basicsize = sizeof(StaticDisjointSetObject),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -260,22 +315,19 @@ StaticDS_dealloc(StaticDisjointSetObject *self)
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-/***************************
- * DynamicDisjointSet Type *
- ***************************/
+/********************************
+ * DynamicDisjointSet: Dynamic *
+ ********************************/
 
 typedef struct {
-    PyObject_HEAD
-    PyObject *parent; /* dictionary mapping objects -> representative */
-    PyObject *rank;   /* dictionary mapping objects -> rank (Python int) */
+    DisjointSetObject base;  /* Inherit from DisjointSet */
+    PyObject *parent; /* dict: element -> representative */
+    PyObject *rank;   /* dict: element -> rank (Python int) */
 } DynamicDisjointSetObject;
 
 static int DynamicDS_init(DynamicDisjointSetObject *self, PyObject *args, PyObject *kwds);
 static void DynamicDS_dealloc(DynamicDisjointSetObject *self);
 
-/* Get the representative of x in the dynamic disjoint set.
-   If x is not already present, add it with parent[x] = x and rank 0.
-   Implements path splitting along the way. */
 static PyObject *
 DynamicDS_find(DynamicDisjointSetObject *self, PyObject *args)
 {
@@ -283,7 +335,6 @@ DynamicDS_find(DynamicDisjointSetObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "O", &x))
         return NULL;
 
-    /* If x is new, add it */
     if (PyDict_Contains(self->parent, x) == 0) {
         if (PyDict_SetItem(self->parent, x, x) < 0)
             return NULL;
@@ -295,29 +346,27 @@ DynamicDS_find(DynamicDisjointSetObject *self, PyObject *args)
             return NULL;
         }
         Py_DECREF(zero);
+        Py_INCREF(x);
+        return x;
     }
 
-    /* Perform find with path splitting */
-    PyObject *current = x;
+    /* Path splitting: update visited nodes to point to their grandparent */
     while (1) {
-        PyObject *par = PyDict_GetItem(self->parent, current);  /* borrowed ref */
-        int is_root = PyObject_RichCompareBool(par, current, Py_EQ);
+        PyObject *par = PyDict_GetItem(self->parent, x);  /* borrowed ref */
+        int is_root = PyObject_RichCompareBool(par, x, Py_EQ);
         if (is_root < 0)
             return NULL;
         if (is_root == 1) {
-            Py_INCREF(current);
-            return current;
+            Py_INCREF(x);
+            return x;
         }
-        /* Get grandparent */
         PyObject *grand = PyDict_GetItem(self->parent, par); /* borrowed ref */
         if (grand == NULL)
             return NULL;
-        /* Update current's parent to its grandparent (path splitting) */
-        if (PyDict_SetItem(self->parent, current, grand) < 0)
+        if (PyDict_SetItem(self->parent, x, grand) < 0)
             return NULL;
-        current = par;
+        x = par;
     }
-    /* Not reached */
     Py_RETURN_NONE;
 }
 
@@ -327,7 +376,6 @@ DynamicDS_union(DynamicDisjointSetObject *self, PyObject *args)
     PyObject *x, *y;
     if (!PyArg_ParseTuple(args, "OO", &x, &y))
         return NULL;
-    /* Call find on x and y */
     PyObject *repX = PyObject_CallMethod((PyObject *)self, "find", "O", x);
     if (!repX)
         return NULL;
@@ -336,7 +384,6 @@ DynamicDS_union(DynamicDisjointSetObject *self, PyObject *args)
         Py_DECREF(repX);
         return NULL;
     }
-    /* If already in the same set, nothing to do */
     int equal = PyObject_RichCompareBool(repX, repY, Py_EQ);
     if (equal < 0) {
         Py_DECREF(repX);
@@ -348,9 +395,8 @@ DynamicDS_union(DynamicDisjointSetObject *self, PyObject *args)
         Py_DECREF(repY);
         Py_RETURN_NONE;
     }
-    /* Get ranks for repX and repY */
-    PyObject *rankX = PyDict_GetItem(self->rank, repX); /* borrowed */
-    PyObject *rankY = PyDict_GetItem(self->rank, repY); /* borrowed */
+    PyObject *rankX = PyDict_GetItem(self->rank, repX);
+    PyObject *rankY = PyDict_GetItem(self->rank, repY);
     if (!rankX || !rankY) {
         Py_DECREF(repX);
         Py_DECREF(repY);
@@ -383,7 +429,6 @@ DynamicDS_union(DynamicDisjointSetObject *self, PyObject *args)
             Py_DECREF(repY);
             return NULL;
         }
-        /* Increase rank for repX */
         PyObject *newRank = PyLong_FromLong(rX + 1);
         if (!newRank) {
             Py_DECREF(repX);
@@ -428,9 +473,6 @@ DynamicDS_match(DynamicDisjointSetObject *self, PyObject *args)
         Py_RETURN_FALSE;
 }
 
-/* Compute groups: returns a frozenset of frozensets.
-   We iterate over keys in self->parent.
-*/
 static PyObject *
 DynamicDS_sets(DynamicDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
 {
@@ -444,14 +486,13 @@ DynamicDS_sets(DynamicDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
     }
     Py_ssize_t len = PyList_Size(keys);
     for (Py_ssize_t i = 0; i < len; i++) {
-        PyObject *elem = PyList_GetItem(keys, i); /* borrowed */
+        PyObject *elem = PyList_GetItem(keys, i);
         PyObject *rep = PyObject_CallMethod((PyObject *)self, "find", "O", elem);
         if (!rep) {
             Py_DECREF(keys);
             Py_DECREF(groups_dict);
             return NULL;
         }
-        /* Use the representative as key */
         PyObject *group = PyDict_GetItem(groups_dict, rep);
         if (group == NULL) {
             group = PySet_New(NULL);
@@ -462,8 +503,8 @@ DynamicDS_sets(DynamicDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
                 return NULL;
             }
             if (PyDict_SetItem(groups_dict, rep, group) < 0) {
-                Py_DECREF(group);
                 Py_DECREF(rep);
+                Py_DECREF(group);
                 Py_DECREF(keys);
                 Py_DECREF(groups_dict);
                 return NULL;
@@ -471,13 +512,15 @@ DynamicDS_sets(DynamicDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
             Py_DECREF(group);
         }
         Py_DECREF(rep);
-        /* Insert elem into the group */
-        group = PyDict_GetItem(groups_dict, PyObject_CallMethod((PyObject *)self, "find", "O", elem));
-        if (!group) {
+
+        PyObject *rep2 = PyObject_CallMethod((PyObject *)self, "find", "O", elem);
+        if (!rep2) {
             Py_DECREF(keys);
             Py_DECREF(groups_dict);
             return NULL;
         }
+        group = PyDict_GetItem(groups_dict, rep2);
+        Py_DECREF(rep2);
         if (PySet_Add(group, elem) < 0) {
             Py_DECREF(keys);
             Py_DECREF(groups_dict);
@@ -498,7 +541,7 @@ DynamicDS_sets(DynamicDisjointSetObject *self, PyObject *Py_UNUSED(ignored))
     }
     len = PyList_Size(vals);
     for (Py_ssize_t i = 0; i < len; i++) {
-        PyObject *group = PyList_GetItem(vals, i); /* borrowed */
+        PyObject *group = PyList_GetItem(vals, i);
         PyObject *froz = PyFrozenSet_New(group);
         if (!froz) {
             Py_DECREF(vals);
@@ -531,10 +574,10 @@ static PyMethodDef DynamicDS_methods[] = {
      "match(x, y): Return True if x and y are in the same set."},
     {"sets", (PyCFunction)DynamicDS_sets, METH_NOARGS,
      "sets(): Return a frozenset of sets of connected nodes."},
-    {NULL}  /* Sentinel */
+    {NULL}
 };
 
-static PyTypeObject DynamicDisjointSetType = {
+PyTypeObject DynamicDisjointSetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "disjointset.DynamicDisjointSet",
     .tp_doc = "Dynamically allocated disjoint set (keys can be any hashable object)",
@@ -574,23 +617,30 @@ DynamicDS_dealloc(DynamicDisjointSetObject *self)
  ***************/
 
 static PyMethodDef module_methods[] = {
-    {NULL}  /* Sentinel */
+    {NULL}
 };
 
 static struct PyModuleDef disjointsetmodule = {
     PyModuleDef_HEAD_INIT,
-    "disjointset",         /* m_name */
-    "Disjoint set data structures (static and dynamic).",  /* m_doc */
-    -1,                    /* m_size */
-    module_methods,        /* m_methods */
+    "disjointset",
+    "Disjoint set data structures (abstract base DisjointSet with static and dynamic variants).",
+    -1,
+    module_methods,
 };
 
 PyMODINIT_FUNC
 PyInit_disjointset(void)
 {
     PyObject *m;
+    if (PyType_Ready(&DisjointSetType) < 0)
+        return NULL;
+
+    /* Set up our concrete types to inherit from DisjointSet */
+    StaticDisjointSetType.tp_base = &DisjointSetType;
     if (PyType_Ready(&StaticDisjointSetType) < 0)
         return NULL;
+
+    DynamicDisjointSetType.tp_base = &DisjointSetType;
     if (PyType_Ready(&DynamicDisjointSetType) < 0)
         return NULL;
 
@@ -598,14 +648,18 @@ PyInit_disjointset(void)
     if (m == NULL)
         return NULL;
 
-    Py_INCREF(&StaticDisjointSetType);
+    if (PyModule_AddObject(m, "DisjointSet", (PyObject *)&DisjointSetType) < 0) {
+        Py_DECREF(&DisjointSetType);
+        Py_DECREF(m);
+        return NULL;
+    }
+
     if (PyModule_AddObject(m, "StaticDisjointSet", (PyObject *)&StaticDisjointSetType) < 0) {
         Py_DECREF(&StaticDisjointSetType);
         Py_DECREF(m);
         return NULL;
     }
 
-    Py_INCREF(&DynamicDisjointSetType);
     if (PyModule_AddObject(m, "DynamicDisjointSet", (PyObject *)&DynamicDisjointSetType) < 0) {
         Py_DECREF(&DynamicDisjointSetType);
         Py_DECREF(m);
@@ -614,4 +668,3 @@ PyInit_disjointset(void)
 
     return m;
 }
-
