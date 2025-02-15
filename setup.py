@@ -11,22 +11,22 @@ def read_file(filename, encoding='utf-8'):
 
 def get_version():
     """
-    Extract the version number from disjointset.c.
+    Extract the version number from fastdisjointset.c.
     It looks for a line of the form:
         #define DISJOINTSET_VERSION "x.y.z"
     """
-    with open('disjointset.c', 'r', encoding='utf-8') as f:
+    with open('fastdisjointset.c', 'r', encoding='utf-8') as f:
         content = f.read()
     match = re.search(r'#define\s+DISJOINTSET_VERSION\s+"([^"]+)"', content)
     if match:
         return match.group(1)
-    raise RuntimeError('Unable to find version string in disjointset.c.')
+    raise RuntimeError('Unable to find version string in fastdisjointset.c.')
 
 
 here = os.path.abspath(os.path.dirname(__file__))
 
 setup(
-    name='disjointset',
+    name='fastdisjointset',
     version=get_version(),
     description='Lightweight C extension module for Python that implements a disjoint set data type for union-find operations.',
     long_description=read_file('README.md'),
@@ -45,6 +45,6 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
-    ext_modules=[Extension('disjointset', sources=['disjointset.c'])],
+    ext_modules=[Extension('fastdisjointset', sources=['fastdisjointset.c'])],
     python_requires='>=3.8',
 )

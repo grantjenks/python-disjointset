@@ -1,5 +1,5 @@
 import unittest
-import disjointset
+import fastdisjointset
 
 ###############################################################################
 # Test cases for the StaticDisjointSet (when constructed with an integer n)
@@ -9,7 +9,7 @@ import disjointset
 class TestStaticDisjointSet(unittest.TestCase):
     def setUp(self):
         # Use the factory: passing an integer returns a StaticDisjointSet.
-        self.ds = disjointset.DisjointSet(5)
+        self.ds = fastdisjointset.DisjointSet(5)
 
     def test_initial_find(self):
         # Initially, each element should be its own representative.
@@ -80,7 +80,7 @@ class TestStaticDisjointSet(unittest.TestCase):
 class TestDynamicDisjointSet(unittest.TestCase):
     def setUp(self):
         # Use the factory: passing None returns a DynamicDisjointSet.
-        self.ds = disjointset.DisjointSet(None)
+        self.ds = fastdisjointset.DisjointSet(None)
 
     def test_find_new_element(self):
         # For a new element, find should return the element itself.
@@ -148,7 +148,7 @@ class TestDynamicDisjointSet(unittest.TestCase):
 class TestDisjointSetFactory(unittest.TestCase):
     def test_factory_static(self):
         # When an integer is supplied, we should get a StaticDisjointSet.
-        ds = disjointset.DisjointSet(10)
+        ds = fastdisjointset.DisjointSet(10)
         # We expect the 'find' method to exist (and StaticDisjointSet uses integer indices)
         self.assertTrue(hasattr(ds, 'find'))
         self.assertEqual(ds.find(0), 0)
@@ -157,15 +157,19 @@ class TestDisjointSetFactory(unittest.TestCase):
 
     def test_factory_dynamic(self):
         # When None is supplied, we should get a DynamicDisjointSet.
-        ds = disjointset.DisjointSet(None)
+        ds = fastdisjointset.DisjointSet(None)
         self.assertTrue(hasattr(ds, 'find'))
         self.assertEqual(ds.find('test'), 'test')
 
     def test_factory_default(self):
         # When nothing is supplied, we should get a DynamicDisjointSet.
-        ds = disjointset.DisjointSet()
+        ds = fastdisjointset.DisjointSet()
         self.assertTrue(hasattr(ds, 'find'))
         self.assertEqual(ds.find('test'), 'test')
+
+    def test_version(self):
+        version = tuple(map(int, fastdisjointset.__version__.split('.')))
+        self.assertTrue(version > (0, 0, 0))
 
 
 if __name__ == '__main__':

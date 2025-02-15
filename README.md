@@ -20,7 +20,7 @@ Both variants support standard union–find operations including `find`, `union`
   - **DynamicDisjointSet:** Ideal for applications requiring support for arbitrary objects, created on the fly.
 
 - **Easy-to-Use API:**
-  A simple factory constructor is provided. Call `disjointset.DisjointSet(n)` (with an integer) to obtain a static variant or `disjointset.DisjointSet()` (no argument) to get the dynamic variant.
+  A simple factory constructor is provided. Call `fastdisjointset.DisjointSet(n)` (with an integer) to obtain a static variant or `fastdisjointset.DisjointSet()` (no argument) to get the dynamic variant.
 
 - **Benchmarking and Testing:**
   Comprehensive benchmarks measure the performance of both the underlying strategies and implementations. Detailed plots are generated during benchmarking and can be viewed via the provided links.
@@ -60,11 +60,11 @@ In addition to multiple strategies for path compression, the project benchmarks 
 
 ![benchmark plot](https://github.com/grantjenks/python-disjointset/blob/main/plot-disjointset.png?raw=true)
 
-The benchmark plot for the disjointset implementation illustrates the tradeoffs between these methods. The static variant shows superior performance when high throughput is needed and the element domain is fixed, while the dynamic variant is invaluable for more flexible or heterogeneous data applications.
+The benchmark plot for the fastdisjointset implementation illustrates the tradeoffs between these methods. The static variant shows superior performance when high throughput is needed and the element domain is fixed, while the dynamic variant is invaluable for more flexible or heterogeneous data applications.
 
 ## Installation
 
-Install disjointset using pip:
+Install fastdisjointset using pip:
 
 ```bash
 python -m pip install fastdisjointset
@@ -78,23 +78,23 @@ cd python-disjointset
 python -m pip install -e .
 ```
 
-> **Note:** As disjointset is a C extension module, you will need a C compiler and the Python development headers installed on your system.
+> **Note:** As fastdisjointset is a C extension module, you will need a C compiler and the Python development headers installed on your system.
 
 ## Usage Example
 
-Below is an example demonstrating how to use disjointset in both static and dynamic modes:
+Below is an example demonstrating how to use fastdisjointset in both static and dynamic modes:
 
 ```python
-import disjointset
+import fastdisjointset
 
 # StaticDisjointSet: Create a disjoint set for 10 elements (0 through 9).
-ds_static = disjointset.DisjointSet(10)
+ds_static = fastdisjointset.DisjointSet(10)
 ds_static.union(1, 2)
 ds_static.union(2, 3)
 print("Static: Are 1 and 3 connected?", ds_static.find(1) == ds_static.find(3))  # Expected output: True
 
 # DynamicDisjointSet: No predefined count; supports arbitrary objects.
-ds_dynamic = disjointset.DisjointSet()
+ds_dynamic = fastdisjointset.DisjointSet()
 ds_dynamic.union('apple', 'banana')
 ds_dynamic.union('banana', 'cherry')
 print("Dynamic: Are 'apple' and 'cherry' connected?", ds_dynamic.find('apple') == ds_dynamic.find('cherry'))  # Expected output: True
@@ -125,7 +125,7 @@ Each script will generate and display a bar chart summarizing the results.
 
 ## Development & Continuous Integration
 
-To develop and test disjointset locally:
+To develop and test fastdisjointset locally:
 
 1. **Clone the repository:**
 
@@ -150,4 +150,4 @@ This project leverages GitHub Actions for continuous integration, which runs tes
 
 ## License
 
-disjointset is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for full details.
+fastdisjointset is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for full details.

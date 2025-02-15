@@ -1,5 +1,5 @@
 /*
- * disjointset.c
+ * fastdisjointset.c
  *
  * This C extension implements a new abstract base type, DisjointSet,
  * which serves as a factory. When constructed with an integer n > 0,
@@ -16,7 +16,7 @@
 #include <stdlib.h>
 
 #ifndef DISJOINTSET_VERSION
-#define DISJOINTSET_VERSION "1.0.2"
+#define DISJOINTSET_VERSION "1.0.3"
 #endif
 
 /******************************
@@ -72,7 +72,7 @@ DisjointSet_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds)
 
 static PyTypeObject DisjointSetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "disjointset.DisjointSet",
+    .tp_name = "fastdisjointset.DisjointSet",
     .tp_doc = "Abstract base class for disjoint sets.\n\n"
               "Call with an integer n to get a static disjoint set, or with None/nothing "
               "to get a dynamic disjoint set.",
@@ -271,7 +271,7 @@ static PyMethodDef StaticDS_methods[] = {
 
 PyTypeObject StaticDisjointSetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "disjointset.StaticDisjointSet",
+    .tp_name = "fastdisjointset.StaticDisjointSet",
     .tp_doc = "Statically allocated disjoint set (n elements: 0 .. n-1)",
     .tp_basicsize = sizeof(StaticDisjointSetObject),
     .tp_itemsize = 0,
@@ -581,7 +581,7 @@ static PyMethodDef DynamicDS_methods[] = {
 
 PyTypeObject DynamicDisjointSetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "disjointset.DynamicDisjointSet",
+    .tp_name = "fastdisjointset.DynamicDisjointSet",
     .tp_doc = "Dynamically allocated disjoint set (keys can be any hashable object)",
     .tp_basicsize = sizeof(DynamicDisjointSetObject),
     .tp_itemsize = 0,
@@ -624,14 +624,14 @@ static PyMethodDef module_methods[] = {
 
 static struct PyModuleDef disjointsetmodule = {
     PyModuleDef_HEAD_INIT,
-    "disjointset",
+    "fastdisjointset",
     "Disjoint set data structures (abstract base DisjointSet with static and dynamic variants).",
     -1,
     module_methods,
 };
 
 PyMODINIT_FUNC
-PyInit_disjointset(void)
+PyInit_fastdisjointset(void)
 {
     PyObject *m;
     if (PyType_Ready(&DisjointSetType) < 0)
@@ -664,6 +664,12 @@ PyInit_disjointset(void)
 
     if (PyModule_AddObject(m, "DynamicDisjointSet", (PyObject *)&DynamicDisjointSetType) < 0) {
         Py_DECREF(&DynamicDisjointSetType);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    /* Add the version string as module attribute __version__ */
+    if (PyModule_AddStringConstant(m, "__version__", DISJOINTSET_VERSION) < 0) {
         Py_DECREF(m);
         return NULL;
     }
