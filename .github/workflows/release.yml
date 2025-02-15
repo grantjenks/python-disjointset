@@ -41,7 +41,6 @@ jobs:
     # Wait for all platforms to build, then publish wheels and a source distribution.
     needs: build_wheels
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
       id-token: write
 
@@ -71,6 +70,12 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel build pkginfo
           python -m build --sdist --outdir sdist
 
+      - name: Copy to dist
+        run: |
+          mkdir dist
+          cp wheels/* dist/
+          cp sdist/* dist/
+          ls dist/
+
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
