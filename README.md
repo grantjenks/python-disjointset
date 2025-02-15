@@ -67,7 +67,7 @@ The benchmark plot for the disjointset implementation illustrates the tradeoffs 
 Install disjointset using pip:
 
 ```bash
-python -m pip install disjointset
+python -m pip install fastdisjointset
 ```
 
 Alternatively, clone the repository and install in editable mode:
